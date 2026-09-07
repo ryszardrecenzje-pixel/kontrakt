@@ -1,13 +1,11 @@
 import streamlit as st
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.enum.style import WD_STYLE_TYPE
+from docx.shared import Pt, RGBColor, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from datetime import datetime
 import io
-import re
 
 # ==================== KONFIGURACJA STRONY ====================
 st.set_page_config(
@@ -17,152 +15,212 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==================== CUSTOM CSS – ciemny elegancki motyw ====================
+# ==================== CUSTOM CSS – czytelny ciemny motyw ====================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap');
     
+    /* Główne tło */
     .stApp {
-        background: linear-gradient(160deg, #0f0f0f 0%, #1a0a0a 50%, #0d0d0d 100%);
-        color: #e8e0e0;
+        background-color: #121212 !important;
+        color: #f0f0f0 !important;
     }
     
-    h1, h2, h3 {
-        font-family: 'Playfair Display', serif !important;
-        color: #f5e6e6 !important;
+    /* Nagłówki */
+    h1, h2, h3, h4 {
+        font-family: 'Playfair Display', Georgia, serif !important;
+        color: #ffffff !important;
     }
     
     .main-title {
-        font-family: 'Playfair Display', serif;
-        font-size: 2.6rem;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 2.5rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #c9a0a0, #e8c4c4, #c9a0a0);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #ffffff !important;
         text-align: center;
-        margin-bottom: 0.3rem;
-        letter-spacing: 1px;
+        margin-bottom: 0.25rem;
+        letter-spacing: 0.5px;
     }
     
     .subtitle {
         text-align: center;
-        color: #a89090;
+        color: #c0c0c0 !important;
         font-size: 1.05rem;
-        margin-bottom: 2rem;
+        margin-bottom: 1.8rem;
         font-weight: 400;
     }
     
-    .section-card {
-        background: rgba(30, 15, 15, 0.7);
-        border: 1px solid #3d2020;
-        border-radius: 12px;
-        padding: 1.5rem 1.8rem;
-        margin-bottom: 1.4rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    /* Pola tekstowe – białe tło + ciemny tekst = maksymalna czytelność */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+        border: 1px solid #555555 !important;
+        border-radius: 8px !important;
+        font-size: 0.95rem !important;
+        padding: 0.6rem 0.8rem !important;
     }
     
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea,
+    .stTextInput > div > div > input::placeholder,
+    .stTextArea > div > div > textarea::placeholder {
+        color: #777777 !important;
+        opacity: 1 !important;
+    }
+    
+    /* Selectbox */
     .stSelectbox > div > div {
-        background-color: #1f1212 !important;
-        color: #f0e8e8 !important;
-        border: 1px solid #4a2c2c !important;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+        border: 1px solid #555555 !important;
         border-radius: 8px !important;
     }
     
-    .stTextArea textarea {
+    .stSelectbox [data-baseweb="select"] {
+        background-color: #ffffff !important;
+    }
+    
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    
+    /* Etykiety pól */
+    label, .stTextInput label, .stTextArea label, .stSelectbox label {
+        color: #f0f0f0 !important;
+        font-weight: 600 !important;
         font-size: 0.95rem !important;
     }
     
+    /* Przyciski */
     .stButton > button {
-        background: linear-gradient(135deg, #6b2d2d, #8b3a3a) !important;
-        color: #fff !important;
+        background-color: #8b2942 !important;
+        color: #ffffff !important;
         border: none !important;
         border-radius: 8px !important;
-        padding: 0.6rem 1.8rem !important;
+        padding: 0.65rem 1.8rem !important;
         font-weight: 600 !important;
-        letter-spacing: 0.5px !important;
-        transition: all 0.25s ease !important;
+        font-size: 1rem !important;
+        transition: all 0.2s ease !important;
     }
     
     .stButton > button:hover {
-        background: linear-gradient(135deg, #8b3a3a, #a84a4a) !important;
-        box-shadow: 0 0 18px rgba(160, 60, 60, 0.45) !important;
-        transform: translateY(-1px);
+        background-color: #a3334f !important;
+        box-shadow: 0 0 16px rgba(139, 41, 66, 0.5) !important;
     }
     
     .stDownloadButton > button {
-        background: linear-gradient(135deg, #2d4a3e, #3d6b55) !important;
-        color: #fff !important;
+        background-color: #2e7d4f !important;
+        color: #ffffff !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
+        font-size: 1rem !important;
+        padding: 0.7rem 1.8rem !important;
     }
     
     .stDownloadButton > button:hover {
-        background: linear-gradient(135deg, #3d6b55, #4d8b6a) !important;
-        box-shadow: 0 0 18px rgba(60, 140, 100, 0.4) !important;
+        background-color: #3a9a62 !important;
+        box-shadow: 0 0 16px rgba(46, 125, 79, 0.45) !important;
     }
     
+    /* Boxy informacyjne */
     .info-box {
-        background: rgba(60, 30, 30, 0.5);
-        border-left: 4px solid #a84a4a;
+        background-color: #2a1f1f !important;
+        border-left: 4px solid #c44d6a !important;
         padding: 1rem 1.2rem;
         border-radius: 0 8px 8px 0;
         margin: 1rem 0;
         font-size: 0.92rem;
-        color: #d8c8c8;
+        color: #f0e8e8 !important;
+        line-height: 1.5;
     }
     
     .success-box {
-        background: rgba(30, 50, 40, 0.5);
-        border-left: 4px solid #4a8b6a;
+        background-color: #1a2e22 !important;
+        border-left: 4px solid #3a9a62 !important;
         padding: 1rem 1.2rem;
         border-radius: 0 8px 8px 0;
         margin: 1rem 0;
-        color: #c8e0d0;
+        color: #e0f0e8 !important;
+        line-height: 1.5;
+        font-size: 1.05rem;
     }
     
+    /* Badges ról */
     .role-badge {
         display: inline-block;
-        padding: 0.25rem 0.8rem;
+        padding: 0.3rem 0.9rem;
         border-radius: 20px;
         font-size: 0.85rem;
         font-weight: 600;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.4px;
+        margin-bottom: 0.6rem;
     }
     
     .badge-dom {
-        background: #4a2020;
-        color: #e8b0b0;
-        border: 1px solid #6b3030;
+        background-color: #5c1e2e !important;
+        color: #ffc0cb !important;
+        border: 1px solid #c44d6a !important;
     }
     
     .badge-sub {
-        background: #202a4a;
-        color: #b0c0e8;
-        border: 1px solid #30406b;
+        background-color: #1e2a5c !important;
+        color: #c0d0ff !important;
+        border: 1px solid #4d6ac4 !important;
     }
     
+    /* Sidebar */
     div[data-testid="stSidebar"] {
-        background: #120a0a;
-        border-right: 1px solid #2a1515;
+        background-color: #1a1a1a !important;
+        border-right: 1px solid #333333 !important;
     }
     
+    div[data-testid="stSidebar"] * {
+        color: #f0f0f0 !important;
+    }
+    
+    div[data-testid="stSidebar"] .info-box {
+        background-color: #2a1f1f !important;
+        color: #f0e8e8 !important;
+    }
+    
+    /* Radio buttons */
     .stRadio > div {
-        gap: 1rem;
+        gap: 1.2rem;
     }
     
-    label {
-        color: #d0c0c0 !important;
-        font-weight: 500 !important;
+    .stRadio label {
+        color: #f0f0f0 !important;
+        font-size: 1rem !important;
     }
     
-    .stMarkdown p {
-        color: #d8d0d0;
+    /* Markdown i zwykły tekst */
+    .stMarkdown, .stMarkdown p, .stMarkdown span {
+        color: #e8e8e8 !important;
     }
     
+    /* Separator */
     hr {
-        border-color: #3a2020 !important;
+        border-color: #444444 !important;
+        margin: 1.5rem 0 !important;
+    }
+    
+    /* File uploader */
+    .stFileUploader {
+        background-color: #1e1e1e !important;
+        border-radius: 8px;
+        padding: 0.5rem;
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Caption */
+    .stCaption, small {
+        color: #aaaaaa !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -194,28 +252,21 @@ def add_horizontal_line(doc):
     pPr.append(pBdr)
 
 
-def create_contract_docx(data: dict, filled_by: str) -> bytes:
-    """
-    Tworzy profesjonalny dokument Word.
-    filled_by: 'dom' | 'sub' | 'both'
-    """
+def create_contract_docx(data: dict) -> bytes:
     doc = Document()
 
-    # Marginesy
     for section in doc.sections:
         section.top_margin = Cm(2.0)
         section.bottom_margin = Cm(2.0)
         section.left_margin = Cm(2.3)
         section.right_margin = Cm(2.3)
 
-    # Style
-    styles = doc.styles
-    style_normal = styles['Normal']
+    style_normal = doc.styles['Normal']
     style_normal.font.name = 'Georgia'
     style_normal.font.size = Pt(11)
     style_normal._element.rPr.rFonts.set(qn('w:eastAsia'), 'Georgia')
 
-    # ===== TYTUŁ =====
+    # Tytuł
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = title.add_run("KONTRAKT")
@@ -236,7 +287,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
 
     add_horizontal_line(doc)
 
-    # ===== PREAMBUŁA =====
+    # Preambuła
     h = doc.add_paragraph()
     run = h.add_run("1. Preambuła i zasady ogólne")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -256,7 +307,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
     p.paragraph_format.space_after = Pt(10)
     p.paragraph_format.line_spacing = 1.15
 
-    # ===== STRONY =====
+    # Strony
     h = doc.add_paragraph()
     run = h.add_run("2. Strony kontraktu")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -284,8 +335,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
 
     add_horizontal_line(doc)
 
-    # ===== FUNKCJA POMOCNICZA DO SEKCJI =====
-    def add_section(title_text: str, content: str, is_placeholder: bool = False):
+    def add_section(title_text: str, content: str):
         h = doc.add_paragraph()
         run = h.add_run(title_text)
         set_run_font(run, size=12, bold=True, color=(90, 30, 30))
@@ -302,7 +352,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
         p.paragraph_format.space_after = Pt(6)
         p.paragraph_format.line_spacing = 1.15
 
-    # ===== SEKCJE DLA DOMINUJĄCEGO =====
+    # Część Dominującego
     h = doc.add_paragraph()
     run = h.add_run("3. Część Osoby Dominującej")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -317,7 +367,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
 
     add_horizontal_line(doc)
 
-    # ===== SEKCJE DLA ULEGŁEGO =====
+    # Część Uległego
     h = doc.add_paragraph()
     run = h.add_run("4. Część Osoby Uległej")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -332,7 +382,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
 
     add_horizontal_line(doc)
 
-    # ===== SAFEWORDS =====
+    # Safewords
     h = doc.add_paragraph()
     run = h.add_run("5. Słowa bezpieczeństwa (Safewords)")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -354,7 +404,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
     set_run_font(run, size=9, italic=True, color=(80, 80, 80))
     p.paragraph_format.space_after = Pt(8)
 
-    # ===== CZAS TRWANIA =====
+    # Czas trwania
     h = doc.add_paragraph()
     run = h.add_run("6. Czas trwania i przeglądy")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -368,7 +418,7 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
 
     add_horizontal_line(doc)
 
-    # ===== PODPISY =====
+    # Potwierdzenie
     h = doc.add_paragraph()
     run = h.add_run("7. Potwierdzenie")
     set_run_font(run, size=13, bold=True, color=(90, 30, 30))
@@ -384,7 +434,6 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
     set_run_font(run, size=9, italic=True)
     p.paragraph_format.space_after = Pt(16)
 
-    # Tabelka na podpisy
     table = doc.add_table(rows=2, cols=2)
     table.autofit = True
 
@@ -410,14 +459,12 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
     run = p.add_run("Data: _______________")
     set_run_font(run, size=9, color=(100, 100, 100))
 
-    # Stopka
     doc.add_paragraph()
     footer = doc.add_paragraph()
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = footer.add_run("Dokument prywatny • Tylko do użytku stron • Nie stanowi umowy cywilnoprawnej")
     set_run_font(run, size=8, color=(130, 130, 130), italic=True)
 
-    # Zapis do bytes
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -425,7 +472,6 @@ def create_contract_docx(data: dict, filled_by: str) -> bytes:
 
 
 def extract_text_from_docx(file) -> str:
-    """Proste wyciągnięcie tekstu z wgranego pliku (do podglądu)."""
     doc = Document(file)
     full = []
     for para in doc.paragraphs:
@@ -437,9 +483,17 @@ def extract_text_from_docx(file) -> str:
 # ==================== UI ====================
 
 st.markdown('<div class="main-title">Kontrakt D/s</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Generator kontraktu Dominujący/a — Uległy/a<br>Narzędzie komunikacji i bezpieczeństwa</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="subtitle">Generator kontraktu Dominujący/a — Uległy/a<br>Narzędzie komunikacji i bezpieczeństwa</div>',
+    unsafe_allow_html=True
+)
 
-# Sidebar
+# Inicjalizacja session_state na plik
+if "docx_bytes" not in st.session_state:
+    st.session_state.docx_bytes = None
+if "docx_filename" not in st.session_state:
+    st.session_state.docx_filename = None
+
 with st.sidebar:
     st.markdown("### Tryb pracy")
     mode = st.radio(
@@ -460,6 +514,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.caption("Aplikacja działa lokalnie. Żadne dane nie są wysyłane na serwer.")
+
 
 # ==================== TRYB 1: NOWY KONTRAKT ====================
 if mode == "Tworzę nowy kontrakt":
@@ -510,7 +565,7 @@ if mode == "Tworzę nowy kontrakt":
             expectations = st.text_area(
                 "Czego oczekuję",
                 height=110,
-                placeholder="Np. przestrzegania ustalonych reguł, inicjatywy w określonych obszarach, konkretnego podejścia do protokołu..."
+                placeholder="Np. przestrzegania ustalonych reguł, inicjatywy w określonych obszarach..."
             )
             hard = st.text_area(
                 "Hard Limits (kategorycznie nie)",
@@ -557,7 +612,9 @@ if mode == "Tworzę nowy kontrakt":
     
     st.markdown("---")
     
-    if st.button("Generuj plik Word (.docx)", use_container_width=True):
+    generate = st.button("Generuj plik Word (.docx)", use_container_width=True, type="primary")
+    
+    if generate:
         data = {
             "dom_name": dom_name,
             "sub_name": sub_name,
@@ -573,14 +630,12 @@ if mode == "Tworzę nowy kontrakt":
                 "dom_hard_limits": hard,
                 "dom_soft_limits": soft,
                 "dom_aftercare": aftercare,
-                # druga strona pusta
                 "sub_needs": "",
                 "sub_expectations": "",
                 "sub_hard_limits": "",
                 "sub_soft_limits": "",
                 "sub_aftercare": "",
             })
-            filled_by = "dom"
         else:
             data.update({
                 "sub_needs": needs,
@@ -594,26 +649,33 @@ if mode == "Tworzę nowy kontrakt":
                 "dom_soft_limits": "",
                 "dom_aftercare": "",
             })
-            filled_by = "sub"
         
-        docx_bytes = create_contract_docx(data, filled_by)
-        
-        filename = f"kontrakt_Ds_{datetime.now().strftime('%Y%m%d_%H%M')}.docx"
-        
-        st.markdown("""
-        <div class="success-box">
-        Plik wygenerowany. Pobierz go i prześlij partnerowi/partnerce. 
-        On/ona wgra plik w trybie „Uzupełniam otrzymany plik” i wypełni swoją część.
-        </div>
-        """, unsafe_allow_html=True)
-        
+        try:
+            docx_bytes = create_contract_docx(data)
+            filename = f"kontrakt_Ds_{datetime.now().strftime('%Y%m%d_%H%M')}.docx"
+            
+            st.session_state.docx_bytes = docx_bytes
+            st.session_state.docx_filename = filename
+            
+            st.markdown("""
+            <div class="success-box">
+            ✅ Plik wygenerowany pomyślnie!<br>
+            Kliknij zielony przycisk poniżej, aby pobrać. Potem prześlij plik partnerowi/partnerce.
+            </div>
+            """, unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Błąd podczas generowania pliku: {e}")
+    
+    # Przycisk pobierania – zawsze widoczny jeśli plik jest w session_state
+    if st.session_state.docx_bytes is not None:
         st.download_button(
-            label="Pobierz kontrakt (.docx)",
-            data=docx_bytes,
-            file_name=filename,
+            label="⬇️  Pobierz kontrakt (.docx)",
+            data=st.session_state.docx_bytes,
+            file_name=st.session_state.docx_filename or "kontrakt_Ds.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
+
 
 # ==================== TRYB 2: UZUPEŁNIANIE ====================
 else:
@@ -629,7 +691,6 @@ else:
         st.markdown("""
         <div class="info-box">
         Plik wczytany. Poniżej możesz zobaczyć jego treść (podgląd) i uzupełnić brakującą część.
-        Aplikacja nie edytuje automatycznie istniejącego pliku – generuje nową, kompletną wersję na podstawie tego, co wpiszesz.
         </div>
         """, unsafe_allow_html=True)
         
@@ -654,7 +715,7 @@ else:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### Dane podstawowe (uzupełnij / popraw)")
+            st.markdown("#### Dane podstawowe")
             dom_name2 = st.text_input("Imię / pseudonim Osoby Dominującej", key="dn2")
             sub_name2 = st.text_input("Imię / pseudonim Osoby Uległej", key="sn2")
             scope2 = st.selectbox(
@@ -693,8 +754,8 @@ else:
                 aftercare2 = st.text_area("Aftercare i komunikacja – moje preferencje", height=80, key="a2b")
         
         st.markdown("---")
-        st.markdown("#### Opcjonalnie – wklej to, co partner już wypełnił (jeśli chcesz mieć pełny dokument)")
-        st.caption("Możesz skopiować z podglądu powyżej odpowiednie fragmenty, żeby finalny plik zawierał obie części.")
+        st.markdown("#### Opcjonalnie – wklej to, co partner już wypełnił")
+        st.caption("Skopiuj z podglądu powyżej odpowiednie fragmenty, żeby finalny plik zawierał obie części.")
         
         if is_dom2:
             other_needs = st.text_area("Czego potrzebuje osoba uległa (z pliku)", height=70, key="on")
@@ -709,7 +770,9 @@ else:
             other_soft = st.text_area("Soft Limits osoby dominującej", height=60, key="os")
             other_after = st.text_area("Aftercare osoby dominującej", height=60, key="oa")
         
-        if st.button("Generuj kompletny kontrakt (.docx)", use_container_width=True, key="gen2"):
+        generate2 = st.button("Generuj kompletny kontrakt (.docx)", use_container_width=True, type="primary", key="gen2")
+        
+        if generate2:
             data = {
                 "dom_name": dom_name2,
                 "sub_name": sub_name2,
@@ -745,19 +808,27 @@ else:
                     "dom_aftercare": other_after,
                 })
             
-            docx_bytes = create_contract_docx(data, "both")
-            filename = f"kontrakt_Ds_kompletny_{datetime.now().strftime('%Y%m%d_%H%M')}.docx"
-            
-            st.markdown("""
-            <div class="success-box">
-            Kompletny kontrakt wygenerowany. Obie strony powinny go przeczytać i potwierdzić.
-            </div>
-            """, unsafe_allow_html=True)
-            
+            try:
+                docx_bytes = create_contract_docx(data)
+                filename = f"kontrakt_Ds_kompletny_{datetime.now().strftime('%Y%m%d_%H%M')}.docx"
+                
+                st.session_state.docx_bytes = docx_bytes
+                st.session_state.docx_filename = filename
+                
+                st.markdown("""
+                <div class="success-box">
+                ✅ Kompletny kontrakt wygenerowany!<br>
+                Kliknij zielony przycisk poniżej, aby pobrać.
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Błąd podczas generowania pliku: {e}")
+        
+        if st.session_state.docx_bytes is not None:
             st.download_button(
-                label="Pobierz kompletny kontrakt (.docx)",
-                data=docx_bytes,
-                file_name=filename,
+                label="⬇️  Pobierz kompletny kontrakt (.docx)",
+                data=st.session_state.docx_bytes,
+                file_name=st.session_state.docx_filename or "kontrakt_Ds_kompletny.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
                 key="dl2"
@@ -766,7 +837,7 @@ else:
 # Stopka
 st.markdown("---")
 st.markdown(
-    "<div style='text-align:center; color:#666; font-size:0.8rem; padding:1rem 0;'>"
+    "<div style='text-align:center; color:#888; font-size:0.8rem; padding:1rem 0;'>"
     "Narzędzie edukacyjne i komunikacyjne • Nie stanowi porady prawnej • Zawsze stawiaj bezpieczeństwo i zgodę na pierwszym miejscu"
     "</div>",
     unsafe_allow_html=True

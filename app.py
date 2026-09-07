@@ -589,19 +589,18 @@ def parse_contract_data(text: str) -> dict:
                 return val
         return ""
 
-    data["dom_name"] = grab(r"Osoba Dominująca:\s*(.+)", text)
-    data["sub_name"] = grab(r"Osoba Uległa:\s*(.+)", text)
-    data["scope"] = grab(r"Zakres dynamiki:\s*(.+)", text)
+    # Pola jednoliniowe – tylko do końca linii
+    data["dom_name"] = grab(r"Osoba Dominująca:\s*([^\n]+)", text)
+    data["sub_name"] = grab(r"Osoba Uległa:\s*([^\n]+)", text)
+    data["scope"] = grab(r"Zakres dynamiki:\s*([^\n]+)", text)
+    data["safewords"] = grab(r"System słów bezpieczeństwa:\s*([^\n]+)", text)
 
-    # Safewords – linia po "System słów bezpieczeństwa:"
-    data["safewords"] = grab(r"System słów bezpieczeństwa:\s*(.+)", text)
-
-    # Czas trwania – sekcja 6
+    # Czas trwania – sekcja 6 (jedna linia po nagłówku)
     data["duration"] = grab(
-        r"6\.\s*Czas trwania i przeglądy\s*\n(.+?)(?=\n\d+\.|$)", text
+        r"6\.\s*Czas trwania i przeglądy\s*\n([^\n]+)", text
     )
 
-    # Sekcje Dominującego
+    # Sekcje wieloliniowe – do następnego nagłówka sekcji
     data["dom_needs"] = grab(
         r"3\.1\s+Czego potrzebuję od osoby uległej\s*\n(.+?)(?=\n3\.2|\n4\.|\n5\.|$)", text
     )
@@ -609,16 +608,15 @@ def parse_contract_data(text: str) -> dict:
         r"3\.2\s+Czego oczekuję\s*\n(.+?)(?=\n3\.3|\n4\.|\n5\.|$)", text
     )
     data["dom_hard_limits"] = grab(
-        r"3\.3\s+Hard Limits.*?\n(.+?)(?=\n3\.4|\n4\.|\n5\.|$)", text
+        r"3\.3\s+Hard Limits[^\n]*\n(.+?)(?=\n3\.4|\n4\.|\n5\.|$)", text
     )
     data["dom_soft_limits"] = grab(
-        r"3\.4\s+Soft Limits.*?\n(.+?)(?=\n3\.5|\n4\.|\n5\.|$)", text
+        r"3\.4\s+Soft Limits[^\n]*\n(.+?)(?=\n3\.5|\n4\.|\n5\.|$)", text
     )
     data["dom_aftercare"] = grab(
-        r"3\.5\s+Preferencje dotyczące aftercare.*?\n(.+?)(?=\n4\.|\n5\.|$)", text
+        r"3\.5\s+Preferencje dotyczące aftercare[^\n]*\n(.+?)(?=\n4\.|\n5\.|$)", text
     )
 
-    # Sekcje Uległego
     data["sub_needs"] = grab(
         r"4\.1\s+Czego potrzebuję od osoby dominującej\s*\n(.+?)(?=\n4\.2|\n5\.|$)", text
     )
@@ -626,13 +624,13 @@ def parse_contract_data(text: str) -> dict:
         r"4\.2\s+Czego oczekuję\s*\n(.+?)(?=\n4\.3|\n5\.|$)", text
     )
     data["sub_hard_limits"] = grab(
-        r"4\.3\s+Hard Limits.*?\n(.+?)(?=\n4\.4|\n5\.|$)", text
+        r"4\.3\s+Hard Limits[^\n]*\n(.+?)(?=\n4\.4|\n5\.|$)", text
     )
     data["sub_soft_limits"] = grab(
-        r"4\.4\s+Soft Limits.*?\n(.+?)(?=\n4\.5|\n5\.|$)", text
+        r"4\.4\s+Soft Limits[^\n]*\n(.+?)(?=\n4\.5|\n5\.|$)", text
     )
     data["sub_aftercare"] = grab(
-        r"4\.5\s+Preferencje dotyczące aftercare.*?\n(.+?)(?=\n5\.|$)", text
+        r"4\.5\s+Preferencje dotyczące aftercare[^\n]*\n(.+?)(?=\n5\.|$)", text
     )
 
     return data
@@ -856,6 +854,22 @@ else:
             parsed = {}
             st.error(f"Nie udało się odczytać pliku: {e}")
 
+        # Wymuś wczytanie danych do session_state (omija cache widgetów Streamlit)
+        file_id = getattr(uploaded, "name", "") + str(getattr(uploaded, "size", 0))
+        if st.session_state.get("_parsed_file_id") != file_id:
+            st.session_state["dn2"] = parsed.get("dom_name", "") or ""
+            st.session_state["sn2"] = parsed.get("sub_name", "") or ""
+            st.session_state["du2"] = parsed.get("duration", "") or ""
+            st.session_state["sw2"] = parsed.get("safewords") or "RED – stop  |  YELLOW – zwolnij  |  GREEN – ok"
+            st.session_state["_parsed_file_id"] = file_id
+            st.session_state["_parsed_data"] = parsed
+            # partner fields – ustawimy po wyborze roli, na razie wyczyść
+            for k in ("on", "oe", "oh", "os", "oa"):
+                if k in st.session_state:
+                    del st.session_state[k]
+
+        parsed = st.session_state.get("_parsed_data", parsed)
+
         st.markdown("""
         <div class="info-box">
         Plik wczytany. Dane podstawowe zostały automatycznie uzupełnione z dokumentu.
@@ -895,11 +909,10 @@ else:
             "Total Power Exchange (TPE)",
             "Inny / do ustalenia"
         ]
-        # Znajdź index dla selectbox
         parsed_scope = parsed.get("scope", "")
         scope_index = 0
         for i, opt in enumerate(scope_options):
-            if parsed_scope and parsed_scope in opt:
+            if parsed_scope and (parsed_scope in opt or opt in parsed_scope):
                 scope_index = i
                 break
         
@@ -909,12 +922,10 @@ else:
             st.markdown("#### Dane podstawowe *(zaciągnięte z pliku)*")
             dom_name2 = st.text_input(
                 "Imię / pseudonim Osoby Dominującej",
-                value=parsed.get("dom_name", ""),
                 key="dn2"
             )
             sub_name2 = st.text_input(
                 "Imię / pseudonim Osoby Uległej",
-                value=parsed.get("sub_name", ""),
                 key="sn2"
             )
             scope2 = st.selectbox(
@@ -925,12 +936,10 @@ else:
             )
             duration2 = st.text_input(
                 "Czas trwania / przeglądy",
-                value=parsed.get("duration", ""),
                 key="du2"
             )
             safewords2 = st.text_input(
                 "Safewords",
-                value=parsed.get("safewords") or "RED – stop  |  YELLOW – zwolnij  |  GREEN – ok",
                 key="sw2"
             )
         
@@ -955,60 +964,35 @@ else:
         st.markdown("#### Dane partnera *(zaciągnięte z pliku – możesz poprawić)*")
         st.caption("Te pola zostały automatycznie wypełnione z wgranego dokumentu. Dzięki temu finalny kontrakt będzie kompletny.")
         
+        # Ustaw dane partnera w session_state przy zmianie roli / pliku
+        role_key = f"{file_id}_{is_dom2}"
+        if st.session_state.get("_partner_role_key") != role_key:
+            if is_dom2:
+                st.session_state["on"] = parsed.get("sub_needs", "") or ""
+                st.session_state["oe"] = parsed.get("sub_expectations", "") or ""
+                st.session_state["oh"] = parsed.get("sub_hard_limits", "") or ""
+                st.session_state["os"] = parsed.get("sub_soft_limits", "") or ""
+                st.session_state["oa"] = parsed.get("sub_aftercare", "") or ""
+            else:
+                st.session_state["on"] = parsed.get("dom_needs", "") or ""
+                st.session_state["oe"] = parsed.get("dom_expectations", "") or ""
+                st.session_state["oh"] = parsed.get("dom_hard_limits", "") or ""
+                st.session_state["os"] = parsed.get("dom_soft_limits", "") or ""
+                st.session_state["oa"] = parsed.get("dom_aftercare", "") or ""
+            st.session_state["_partner_role_key"] = role_key
+        
         if is_dom2:
-            # Partner = uległy – bierzemy dane sub z pliku
-            other_needs = st.text_area(
-                "Czego potrzebuje osoba uległa",
-                value=parsed.get("sub_needs", ""),
-                height=70, key="on"
-            )
-            other_exp = st.text_area(
-                "Czego oczekuje osoba uległa",
-                value=parsed.get("sub_expectations", ""),
-                height=70, key="oe"
-            )
-            other_hard = st.text_area(
-                "Hard Limits osoby uległej",
-                value=parsed.get("sub_hard_limits", ""),
-                height=70, key="oh"
-            )
-            other_soft = st.text_area(
-                "Soft Limits osoby uległej",
-                value=parsed.get("sub_soft_limits", ""),
-                height=60, key="os"
-            )
-            other_after = st.text_area(
-                "Aftercare osoby uległej",
-                value=parsed.get("sub_aftercare", ""),
-                height=60, key="oa"
-            )
+            other_needs = st.text_area("Czego potrzebuje osoba uległa", height=70, key="on")
+            other_exp = st.text_area("Czego oczekuje osoba uległa", height=70, key="oe")
+            other_hard = st.text_area("Hard Limits osoby uległej", height=70, key="oh")
+            other_soft = st.text_area("Soft Limits osoby uległej", height=60, key="os")
+            other_after = st.text_area("Aftercare osoby uległej", height=60, key="oa")
         else:
-            # Partner = dominujący – bierzemy dane dom z pliku
-            other_needs = st.text_area(
-                "Czego potrzebuje osoba dominująca",
-                value=parsed.get("dom_needs", ""),
-                height=70, key="on"
-            )
-            other_exp = st.text_area(
-                "Czego oczekuje osoba dominująca",
-                value=parsed.get("dom_expectations", ""),
-                height=70, key="oe"
-            )
-            other_hard = st.text_area(
-                "Hard Limits osoby dominującej",
-                value=parsed.get("dom_hard_limits", ""),
-                height=70, key="oh"
-            )
-            other_soft = st.text_area(
-                "Soft Limits osoby dominującej",
-                value=parsed.get("dom_soft_limits", ""),
-                height=60, key="os"
-            )
-            other_after = st.text_area(
-                "Aftercare osoby dominującej",
-                value=parsed.get("dom_aftercare", ""),
-                height=60, key="oa"
-            )
+            other_needs = st.text_area("Czego potrzebuje osoba dominująca", height=70, key="on")
+            other_exp = st.text_area("Czego oczekuje osoba dominująca", height=70, key="oe")
+            other_hard = st.text_area("Hard Limits osoby dominującej", height=70, key="oh")
+            other_soft = st.text_area("Soft Limits osoby dominującej", height=60, key="os")
+            other_after = st.text_area("Aftercare osoby dominującej", height=60, key="oa")
         
         generate2 = st.button("Generuj kompletny kontrakt (.docx)", use_container_width=True, type="primary", key="gen2")
         

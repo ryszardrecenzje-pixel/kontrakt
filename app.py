@@ -268,9 +268,38 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
+    div[data-testid="stExpander"] {
+        background-color: #1a1a1a !important;
+        border: 1px solid #444444 !important;
+        border-radius: 8px !important;
+    }
+    
+    div[data-testid="stExpander"] p,
+    div[data-testid="stExpander"] span,
+    div[data-testid="stExpander"] pre,
+    div[data-testid="stExpander"] code,
+    div[data-testid="stExpander"] .stMarkdown {
+        color: #f0f0f0 !important;
+    }
+    
     /* Caption */
     .stCaption, small {
         color: #aaaaaa !important;
+    }
+    
+    /* Podgląd tekstu dokumentu */
+    .preview-box {
+        background-color: #1e1e1e !important;
+        color: #f0f0f0 !important;
+        border: 1px solid #444444 !important;
+        border-radius: 8px !important;
+        padding: 1.2rem !important;
+        font-family: Georgia, serif !important;
+        font-size: 0.9rem !important;
+        line-height: 1.55 !important;
+        white-space: pre-wrap !important;
+        max-height: 400px !important;
+        overflow-y: auto !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -744,10 +773,20 @@ else:
         </div>
         """, unsafe_allow_html=True)
         
-        with st.expander("Podgląd treści wgranego pliku"):
+        with st.expander("Podgląd treści wgranego pliku", expanded=True):
             try:
                 text = extract_text_from_docx(uploaded)
-                st.text(text[:4000] + ("..." if len(text) > 4000 else ""))
+                preview = text[:4000] + ("..." if len(text) > 4000 else "")
+                # Escape HTML
+                preview_safe = (
+                    preview.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+                st.markdown(
+                    f'<div class="preview-box">{preview_safe}</div>',
+                    unsafe_allow_html=True
+                )
             except Exception as e:
                 st.error(f"Nie udało się odczytać pliku: {e}")
         

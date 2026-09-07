@@ -168,19 +168,60 @@ st.markdown("""
         border: 1px solid #4d6ac4 !important;
     }
     
-    /* Sidebar */
+    /* Sidebar – wymuszony ciemny motyw + wysoki kontrast */
+    section[data-testid="stSidebar"],
     div[data-testid="stSidebar"] {
-        background-color: #1a1a1a !important;
+        background-color: #0f0f0f !important;
         border-right: 1px solid #333333 !important;
     }
     
-    div[data-testid="stSidebar"] * {
+    section[data-testid="stSidebar"] > div,
+    div[data-testid="stSidebar"] > div {
+        background-color: #0f0f0f !important;
+    }
+    
+    /* Cały tekst w sidebarze */
+    section[data-testid="stSidebar"] *,
+    div[data-testid="stSidebar"] *,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] .stMarkdown,
+    section[data-testid="stSidebar"] .stMarkdown p {
         color: #f0f0f0 !important;
     }
     
+    /* Radio w sidebarze */
+    section[data-testid="stSidebar"] .stRadio label {
+        color: #ffffff !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Info-box w sidebarze */
+    section[data-testid="stSidebar"] .info-box,
     div[data-testid="stSidebar"] .info-box {
-        background-color: #2a1f1f !important;
-        color: #f0e8e8 !important;
+        background-color: #2a1a1a !important;
+        border-left: 4px solid #c44d6a !important;
+        color: #f5eaea !important;
+    }
+    
+    section[data-testid="stSidebar"] .info-box b,
+    div[data-testid="stSidebar"] .info-box b {
+        color: #ffb0c0 !important;
+    }
+    
+    /* Caption w sidebarze */
+    section[data-testid="stSidebar"] .stCaption,
+    section[data-testid="stSidebar"] small {
+        color: #aaaaaa !important;
+    }
+    
+    /* Nagłówki w sidebarze */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h4 {
+        color: #ffffff !important;
     }
     
     /* Radio buttons */

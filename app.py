@@ -50,38 +50,47 @@ st.markdown("""
         font-weight: 400;
     }
     
-    /* Pola tekstowe – białe tło + ciemny tekst = maksymalna czytelność */
+    /* Pola tekstowe – białe tło + CZARNY tekst */
     .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
+    .stTextArea > div > div > textarea,
+    .stTextInput input,
+    .stTextArea textarea,
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stTextArea"] textarea,
+    input[type="text"],
+    textarea {
         background-color: #ffffff !important;
-        color: #1a1a1a !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         border: 1px solid #555555 !important;
         border-radius: 8px !important;
         font-size: 0.95rem !important;
         padding: 0.6rem 0.8rem !important;
+        caret-color: #000000 !important;
     }
     
     .stTextInput > div > div > input::placeholder,
-    .stTextArea > div > div > textarea::placeholder {
-        color: #777777 !important;
+    .stTextArea > div > div > textarea::placeholder,
+    input::placeholder,
+    textarea::placeholder {
+        color: #666666 !important;
+        -webkit-text-fill-color: #666666 !important;
         opacity: 1 !important;
     }
     
     /* Selectbox */
-    .stSelectbox > div > div {
+    .stSelectbox > div > div,
+    .stSelectbox [data-baseweb="select"],
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="select"] span {
         background-color: #ffffff !important;
-        color: #1a1a1a !important;
-        border: 1px solid #555555 !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         border-radius: 8px !important;
     }
     
-    .stSelectbox [data-baseweb="select"] {
-        background-color: #ffffff !important;
-    }
-    
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #1a1a1a !important;
+    .stSelectbox > div > div {
+        border: 1px solid #555555 !important;
     }
     
     /* Etykiety pól */

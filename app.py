@@ -559,6 +559,85 @@ def extract_text_from_docx(file) -> str:
     return "\n".join(full)
 
 
+def parse_contract_data(text: str) -> dict:
+    """Wyciąga dane podstawowe i sekcje z tekstu kontraktu."""
+    import re
+    data = {
+        "dom_name": "",
+        "sub_name": "",
+        "scope": "",
+        "duration": "",
+        "safewords": "",
+        "dom_needs": "",
+        "dom_expectations": "",
+        "dom_hard_limits": "",
+        "dom_soft_limits": "",
+        "dom_aftercare": "",
+        "sub_needs": "",
+        "sub_expectations": "",
+        "sub_hard_limits": "",
+        "sub_soft_limits": "",
+        "sub_aftercare": "",
+    }
+
+    def grab(pattern, src):
+        m = re.search(pattern, src, re.IGNORECASE | re.DOTALL)
+        if m:
+            val = m.group(1).strip()
+            # Odrzuć placeholdery
+            if val and "[DO UZUPEŁNIENIA" not in val and "……………………" not in val:
+                return val
+        return ""
+
+    data["dom_name"] = grab(r"Osoba Dominująca:\s*(.+)", text)
+    data["sub_name"] = grab(r"Osoba Uległa:\s*(.+)", text)
+    data["scope"] = grab(r"Zakres dynamiki:\s*(.+)", text)
+
+    # Safewords – linia po "System słów bezpieczeństwa:"
+    data["safewords"] = grab(r"System słów bezpieczeństwa:\s*(.+)", text)
+
+    # Czas trwania – sekcja 6
+    data["duration"] = grab(
+        r"6\.\s*Czas trwania i przeglądy\s*\n(.+?)(?=\n\d+\.|$)", text
+    )
+
+    # Sekcje Dominującego
+    data["dom_needs"] = grab(
+        r"3\.1\s+Czego potrzebuję od osoby uległej\s*\n(.+?)(?=\n3\.2|\n4\.|\n5\.|$)", text
+    )
+    data["dom_expectations"] = grab(
+        r"3\.2\s+Czego oczekuję\s*\n(.+?)(?=\n3\.3|\n4\.|\n5\.|$)", text
+    )
+    data["dom_hard_limits"] = grab(
+        r"3\.3\s+Hard Limits.*?\n(.+?)(?=\n3\.4|\n4\.|\n5\.|$)", text
+    )
+    data["dom_soft_limits"] = grab(
+        r"3\.4\s+Soft Limits.*?\n(.+?)(?=\n3\.5|\n4\.|\n5\.|$)", text
+    )
+    data["dom_aftercare"] = grab(
+        r"3\.5\s+Preferencje dotyczące aftercare.*?\n(.+?)(?=\n4\.|\n5\.|$)", text
+    )
+
+    # Sekcje Uległego
+    data["sub_needs"] = grab(
+        r"4\.1\s+Czego potrzebuję od osoby dominującej\s*\n(.+?)(?=\n4\.2|\n5\.|$)", text
+    )
+    data["sub_expectations"] = grab(
+        r"4\.2\s+Czego oczekuję\s*\n(.+?)(?=\n4\.3|\n5\.|$)", text
+    )
+    data["sub_hard_limits"] = grab(
+        r"4\.3\s+Hard Limits.*?\n(.+?)(?=\n4\.4|\n5\.|$)", text
+    )
+    data["sub_soft_limits"] = grab(
+        r"4\.4\s+Soft Limits.*?\n(.+?)(?=\n4\.5|\n5\.|$)", text
+    )
+    data["sub_aftercare"] = grab(
+        r"4\.5\s+Preferencje dotyczące aftercare.*?\n(.+?)(?=\n5\.|$)", text
+    )
+
+    return data
+
+
 # ==================== UI ====================
 
 st.markdown('<div class="main-title">Kontrakt D/s</div>', unsafe_allow_html=True)
@@ -767,17 +846,26 @@ else:
     )
     
     if uploaded:
+        # Parsuj dokument
+        try:
+            uploaded.seek(0)
+            text = extract_text_from_docx(uploaded)
+            parsed = parse_contract_data(text)
+        except Exception as e:
+            text = ""
+            parsed = {}
+            st.error(f"Nie udało się odczytać pliku: {e}")
+
         st.markdown("""
         <div class="info-box">
-        Plik wczytany. Poniżej możesz zobaczyć jego treść (podgląd) i uzupełnić brakującą część.
+        Plik wczytany. Dane podstawowe zostały automatycznie uzupełnione z dokumentu.
+        Uzupełnij swoją część poniżej.
         </div>
         """, unsafe_allow_html=True)
         
-        with st.expander("Podgląd treści wgranego pliku", expanded=True):
-            try:
-                text = extract_text_from_docx(uploaded)
+        with st.expander("Podgląd treści wgranego pliku", expanded=False):
+            if text:
                 preview = text[:4000] + ("..." if len(text) > 4000 else "")
-                # Escape HTML
                 preview_safe = (
                     preview.replace("&", "&amp;")
                     .replace("<", "&lt;")
@@ -787,8 +875,6 @@ else:
                     f'<div class="preview-box">{preview_safe}</div>',
                     unsafe_allow_html=True
                 )
-            except Exception as e:
-                st.error(f"Nie udało się odczytać pliku: {e}")
         
         st.markdown("---")
         st.markdown("### Uzupełnij swoją część")
@@ -801,27 +887,50 @@ else:
         )
         is_dom2 = filler2 == "Osoba Dominująca"
         
+        # Opcje zakresu dynamiki
+        scope_options = [
+            "Tylko sceny (scene-only)",
+            "Częściowy (part-time / weekendowy)",
+            "24/7 z wyjątkami",
+            "Total Power Exchange (TPE)",
+            "Inny / do ustalenia"
+        ]
+        # Znajdź index dla selectbox
+        parsed_scope = parsed.get("scope", "")
+        scope_index = 0
+        for i, opt in enumerate(scope_options):
+            if parsed_scope and parsed_scope in opt:
+                scope_index = i
+                break
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### Dane podstawowe")
-            dom_name2 = st.text_input("Imię / pseudonim Osoby Dominującej", key="dn2")
-            sub_name2 = st.text_input("Imię / pseudonim Osoby Uległej", key="sn2")
+            st.markdown("#### Dane podstawowe *(zaciągnięte z pliku)*")
+            dom_name2 = st.text_input(
+                "Imię / pseudonim Osoby Dominującej",
+                value=parsed.get("dom_name", ""),
+                key="dn2"
+            )
+            sub_name2 = st.text_input(
+                "Imię / pseudonim Osoby Uległej",
+                value=parsed.get("sub_name", ""),
+                key="sn2"
+            )
             scope2 = st.selectbox(
                 "Zakres dynamiki",
-                [
-                    "Tylko sceny (scene-only)",
-                    "Częściowy (part-time / weekendowy)",
-                    "24/7 z wyjątkami",
-                    "Total Power Exchange (TPE)",
-                    "Inny / do ustalenia"
-                ],
+                scope_options,
+                index=scope_index,
                 key="sc2"
             )
-            duration2 = st.text_input("Czas trwania / przeglądy", key="du2")
+            duration2 = st.text_input(
+                "Czas trwania / przeglądy",
+                value=parsed.get("duration", ""),
+                key="du2"
+            )
             safewords2 = st.text_input(
                 "Safewords",
-                value="RED – stop  |  YELLOW – zwolnij  |  GREEN – ok",
+                value=parsed.get("safewords") or "RED – stop  |  YELLOW – zwolnij  |  GREEN – ok",
                 key="sw2"
             )
         
@@ -843,21 +952,63 @@ else:
                 aftercare2 = st.text_area("Aftercare i komunikacja – moje preferencje", height=80, key="a2b")
         
         st.markdown("---")
-        st.markdown("#### Opcjonalnie – wklej to, co partner już wypełnił")
-        st.caption("Skopiuj z podglądu powyżej odpowiednie fragmenty, żeby finalny plik zawierał obie części.")
+        st.markdown("#### Dane partnera *(zaciągnięte z pliku – możesz poprawić)*")
+        st.caption("Te pola zostały automatycznie wypełnione z wgranego dokumentu. Dzięki temu finalny kontrakt będzie kompletny.")
         
         if is_dom2:
-            other_needs = st.text_area("Czego potrzebuje osoba uległa (z pliku)", height=70, key="on")
-            other_exp = st.text_area("Czego oczekuje osoba uległa", height=70, key="oe")
-            other_hard = st.text_area("Hard Limits osoby uległej", height=70, key="oh")
-            other_soft = st.text_area("Soft Limits osoby uległej", height=60, key="os")
-            other_after = st.text_area("Aftercare osoby uległej", height=60, key="oa")
+            # Partner = uległy – bierzemy dane sub z pliku
+            other_needs = st.text_area(
+                "Czego potrzebuje osoba uległa",
+                value=parsed.get("sub_needs", ""),
+                height=70, key="on"
+            )
+            other_exp = st.text_area(
+                "Czego oczekuje osoba uległa",
+                value=parsed.get("sub_expectations", ""),
+                height=70, key="oe"
+            )
+            other_hard = st.text_area(
+                "Hard Limits osoby uległej",
+                value=parsed.get("sub_hard_limits", ""),
+                height=70, key="oh"
+            )
+            other_soft = st.text_area(
+                "Soft Limits osoby uległej",
+                value=parsed.get("sub_soft_limits", ""),
+                height=60, key="os"
+            )
+            other_after = st.text_area(
+                "Aftercare osoby uległej",
+                value=parsed.get("sub_aftercare", ""),
+                height=60, key="oa"
+            )
         else:
-            other_needs = st.text_area("Czego potrzebuje osoba dominująca (z pliku)", height=70, key="on")
-            other_exp = st.text_area("Czego oczekuje osoba dominująca", height=70, key="oe")
-            other_hard = st.text_area("Hard Limits osoby dominującej", height=70, key="oh")
-            other_soft = st.text_area("Soft Limits osoby dominującej", height=60, key="os")
-            other_after = st.text_area("Aftercare osoby dominującej", height=60, key="oa")
+            # Partner = dominujący – bierzemy dane dom z pliku
+            other_needs = st.text_area(
+                "Czego potrzebuje osoba dominująca",
+                value=parsed.get("dom_needs", ""),
+                height=70, key="on"
+            )
+            other_exp = st.text_area(
+                "Czego oczekuje osoba dominująca",
+                value=parsed.get("dom_expectations", ""),
+                height=70, key="oe"
+            )
+            other_hard = st.text_area(
+                "Hard Limits osoby dominującej",
+                value=parsed.get("dom_hard_limits", ""),
+                height=70, key="oh"
+            )
+            other_soft = st.text_area(
+                "Soft Limits osoby dominującej",
+                value=parsed.get("dom_soft_limits", ""),
+                height=60, key="os"
+            )
+            other_after = st.text_area(
+                "Aftercare osoby dominującej",
+                value=parsed.get("dom_aftercare", ""),
+                height=60, key="oa"
+            )
         
         generate2 = st.button("Generuj kompletny kontrakt (.docx)", use_container_width=True, type="primary", key="gen2")
         
